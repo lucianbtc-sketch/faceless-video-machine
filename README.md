@@ -47,6 +47,16 @@ fvm production-plan --project why-cities-are-getting-hotter --format json --outp
 
 This saves `production.json` and `production.md`. The shot list starts with one scene per script section and includes scene numbers, narration references, estimated durations, visual/B-roll direction, asset types, on-screen text, and optional notes. Narration remains in `video-script.json`, which is the authoritative source.
 
+Create an offline asset manifest from the production shot list:
+
+```bash
+fvm create-asset-manifest --project why-cities-are-getting-hotter
+fvm asset-manifest --project why-cities-are-getting-hotter
+fvm asset-manifest --project why-cities-are-getting-hotter --format json --output asset-manifest-export.json
+```
+
+This saves `asset-manifest.json` and `asset-manifest.md`. It creates one initial requirement per production scene with a deterministic asset ID, source and local-path fields, lifecycle status, rights metadata, attribution, and notes. The manifest is metadata-only: it does not search for, download, inspect, or validate assets. `production.json` remains the authoritative production-plan source.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -61,6 +71,8 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `video-script`
 - `create-production-plan`
 - `production-plan`
+- `create-asset-manifest`
+- `asset-manifest`
 - `generate-script`
 - `script`
 

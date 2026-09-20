@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .models import ResearchSource, VideoProject
+from .asset_manifest import create_asset_manifest, load_asset_manifest, render_asset_manifest_markdown, save_asset_manifest
 from .projects import create_project, slugify
 from .production_planning import create_production_plan, load_production_plan, render_production_plan_markdown, save_production_plan
 from .research import export_research, load_research, save_research
@@ -50,6 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
     production.add_argument("--project", required=True); production.add_argument("--projects-dir", default="projects")
     view_production = subs.add_parser("production-plan", help="display or export an editable production shot list")
     view_production.add_argument("--project", required=True); view_production.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_production.add_argument("--output"); view_production.add_argument("--projects-dir", default="projects")
+    asset_manifest = subs.add_parser("create-asset-manifest", help="create an offline asset manifest from the production plan")
+    asset_manifest.add_argument("--project", required=True); asset_manifest.add_argument("--projects-dir", default="projects")
+    view_asset_manifest = subs.add_parser("asset-manifest", help="display or export an offline asset manifest")
+    view_asset_manifest.add_argument("--project", required=True); view_asset_manifest.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_asset_manifest.add_argument("--output"); view_asset_manifest.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -89,6 +94,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "production-plan":
             plan = load_production_plan(path); content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_production_plan_markdown(plan)
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported production plan: {args.output}")
+            else: print(content, end="")
+            return 0
+        if args.command == "create-asset-manifest":
+            production = load_production_plan(path)
+            json_path, markdown_path = save_asset_manifest(create_asset_manifest(production), path)
+            print(f"Created asset manifest: {json_path}"); print(f"Markdown manifest: {markdown_path}"); return 0
+        if args.command == "asset-manifest":
+            manifest = load_asset_manifest(path); content = json.dumps(manifest.to_dict(), indent=2) + "\n" if args.format == "json" else render_asset_manifest_markdown(manifest)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported asset manifest: {args.output}")
             else: print(content, end="")
             return 0
         if args.command == "generate-script":

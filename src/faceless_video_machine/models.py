@@ -199,6 +199,106 @@ class ProductionPlan:
         )
 
 
+ASSET_MANIFEST_TYPES = (
+    "image",
+    "video",
+    "graphic",
+    "screenshot",
+    "screen_recording",
+    "text_card",
+    "archive",
+    "other",
+)
+ASSET_STATUSES = ("needed", "sourced", "downloaded", "ready", "rejected")
+
+
+@dataclass(slots=True)
+class AssetManifestEntry:
+    """Metadata for one asset requirement; it does not inspect or fetch assets."""
+
+    asset_id: str
+    scene_number: int
+    scene_reference: str
+    asset_type: str
+    description: str
+    source_url: str = ""
+    source_name: str = ""
+    local_path: str = ""
+    status: str = "needed"
+    rights_note: str = ""
+    attribution: str = ""
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.asset_id.strip():
+            raise ValueError("asset_id cannot be empty")
+        if self.scene_number <= 0:
+            raise ValueError("scene_number must be greater than zero")
+        if not self.scene_reference.strip():
+            raise ValueError("scene_reference cannot be empty")
+        if self.asset_type not in ASSET_MANIFEST_TYPES:
+            raise ValueError(f"unsupported asset type: {self.asset_type}")
+        if not self.description.strip():
+            raise ValueError("asset description cannot be empty")
+        if self.status not in ASSET_STATUSES:
+            raise ValueError(f"unsupported asset status: {self.status}")
+        if self.status == "sourced" and not (self.source_url.strip() or self.source_name.strip()):
+            raise ValueError("sourced assets need a source URL or source name")
+        if self.status in ("downloaded", "ready") and not self.local_path.strip():
+            raise ValueError(f"{self.status} assets need a local path")
+        if self.status == "rejected" and not self.notes.strip():
+            raise ValueError("rejected assets need notes explaining the rejection")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetManifestEntry":
+        return cls(**data)
+
+
+@dataclass(slots=True)
+class AssetManifest:
+    """An offline asset inventory linked to an authoritative ProductionPlan."""
+
+    project_id: str
+    title: str
+    source_production_plan: str
+    assets: list[AssetManifestEntry]
+
+    def __post_init__(self) -> None:
+        if not self.project_id.strip():
+            raise ValueError("project_id cannot be empty")
+        if not self.title.strip():
+            raise ValueError("title cannot be empty")
+        if not self.source_production_plan.strip():
+            raise ValueError("source_production_plan cannot be empty")
+        asset_ids = [asset.asset_id for asset in self.assets]
+        if len(asset_ids) != len(set(asset_ids)):
+            raise ValueError("asset IDs must be unique")
+
+    @property
+    def status_counts(self) -> dict[str, int]:
+        return {status: sum(asset.status == status for asset in self.assets) for status in ASSET_STATUSES}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "title": self.title,
+            "source_production_plan": self.source_production_plan,
+            "assets": [asset.to_dict() for asset in self.assets],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetManifest":
+        return cls(
+            project_id=data["project_id"],
+            title=data["title"],
+            source_production_plan=data["source_production_plan"],
+            assets=[AssetManifestEntry.from_dict(item) for item in data.get("assets", [])],
+        )
+
+
 @dataclass(slots=True)
 class ResearchSource:
     """A manually recorded source and the facts taken from it."""
