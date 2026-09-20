@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .models import ResearchSource, VideoProject
 from .asset_manifest import create_asset_manifest, load_asset_manifest, render_asset_manifest_markdown, save_asset_manifest
-from .asset_sourcing import add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
+from .asset_sourcing import AssetSourceError, add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
 from .models import AssetCandidate, AssetCandidateMatch, AssetSource
 from .projects import create_project, slugify
 from .production_planning import create_production_plan, load_production_plan, render_production_plan_markdown, save_production_plan
@@ -65,6 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_candidate.add_argument("--project", required=True); add_candidate.add_argument("--asset-id", required=True); add_candidate.add_argument("--candidate-id", required=True); add_candidate.add_argument("--source-id", required=True); add_candidate.add_argument("--source-name", required=True); add_candidate.add_argument("--url", required=True); add_candidate.add_argument("--title", required=True); add_candidate.add_argument("--creator", default=""); add_candidate.add_argument("--license", dest="license_name", default=""); add_candidate.add_argument("--license-url", default=""); add_candidate.add_argument("--usage", dest="usage_information", default=""); add_candidate.add_argument("--preview-url", default=""); add_candidate.add_argument("--attribution", default=""); add_candidate.add_argument("--rights-note", default=""); add_candidate.add_argument("--notes", default=""); add_candidate.add_argument("--source-url", default=""); add_candidate.add_argument("--license-policy-url", default=""); add_candidate.add_argument("--source-kind", choices=("manual", "public_domain", "creative_commons", "local_catalog"), default="manual"); add_candidate.add_argument("--projects-dir", default="projects")
     link_candidate = subs.add_parser("link-asset-candidate", help="record an editorial candidate relationship")
     link_candidate.add_argument("--project", required=True); link_candidate.add_argument("--asset-id", required=True); link_candidate.add_argument("--candidate-id", required=True); link_candidate.add_argument("--relationship", choices=("candidate", "shortlisted", "selected", "rejected"), default="candidate"); link_candidate.add_argument("--notes", default=""); link_candidate.add_argument("--projects-dir", default="projects")
+    search_candidates = subs.add_parser("search-asset-candidates", help="search Wikimedia Commons metadata without downloading media")
+    search_candidates.add_argument("--project", required=True); search_candidates.add_argument("--asset-id", required=True); search_candidates.add_argument("--limit", type=int); search_candidates.add_argument("--timeout", type=float); search_candidates.add_argument("--user-agent"); search_candidates.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -135,6 +137,21 @@ def main(argv: list[str] | None = None) -> int:
             match = AssetCandidateMatch(args.asset_id, args.candidate_id, args.relationship, args.notes)
             json_path, _ = save_asset_sourcing_plan(link_asset_candidate(sourcing, manifest, match), path)
             print(f"Linked asset candidate: {args.candidate_id} ({json_path})"); return 0
+        if args.command == "search-asset-candidates":
+            from .asset_sourcing import merge_asset_candidates
+            from .wikimedia_commons import WikimediaCommonsConfig, WikimediaCommonsProvider
+
+            manifest = load_asset_manifest(path); sourcing = load_asset_sourcing_plan(path)
+            requirement = next((asset for asset in manifest.assets if asset.asset_id == args.asset_id), None)
+            if requirement is None:
+                raise ValueError(f"unknown manifest asset: {args.asset_id}")
+            config = WikimediaCommonsConfig.from_environment(user_agent=args.user_agent)
+            if args.limit or args.timeout:
+                config = WikimediaCommonsConfig(config.api_url, config.user_agent, args.timeout or config.timeout_seconds, config.request_interval_seconds, args.limit or config.max_results)
+            candidates = WikimediaCommonsProvider(config).find_candidates(requirement)
+            updated = merge_asset_candidates(sourcing, manifest, WikimediaCommonsProvider.source, candidates)
+            json_path, _ = save_asset_sourcing_plan(updated, path)
+            print(f"Found {len(candidates)} Wikimedia Commons candidates; saved: {json_path}"); return 0
         if args.command == "generate-script":
             project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)
             json_path, markdown_path = save_script_draft(TemplateProvider().generate(brief, plan), path)
@@ -154,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported research brief: {args.output}")
             else: print(content, end="")
             return 0
-    except (FileExistsError, FileNotFoundError, ValueError) as error:
+    except (AssetSourceError, FileExistsError, FileNotFoundError, ValueError) as error:
         print(str(error), file=sys.stderr); return 1
     return 1
 

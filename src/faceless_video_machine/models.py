@@ -299,7 +299,7 @@ class AssetManifest:
         )
 
 
-ASSET_SOURCE_KINDS = ("manual", "public_domain", "creative_commons", "local_catalog")
+ASSET_SOURCE_KINDS = ("manual", "public_domain", "creative_commons", "local_catalog", "other")
 ASSET_CANDIDATE_RELATIONSHIPS = ("candidate", "shortlisted", "selected", "rejected")
 
 

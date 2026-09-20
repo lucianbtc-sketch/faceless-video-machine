@@ -80,6 +80,26 @@ def add_asset_candidate(
     return AssetSourcingPlan(plan.project_id, plan.title, plan.source_asset_manifest, sources, candidates, list(plan.matches))
 
 
+def merge_asset_candidates(
+    plan: AssetSourcingPlan,
+    manifest: AssetManifest,
+    source: AssetSource,
+    candidates: list[AssetCandidate],
+) -> AssetSourcingPlan:
+    """Add or replace provider candidates without changing manifest statuses."""
+    updated = plan
+    for candidate in candidates:
+        existing = next((item for item in updated.candidates if item.candidate_id == candidate.candidate_id), None)
+        if existing is None:
+            updated = add_asset_candidate(updated, manifest, candidate, source)
+            continue
+        if existing.asset_id != candidate.asset_id or existing.source_id != candidate.source_id:
+            raise ValueError(f"candidate ID conflicts with existing metadata: {candidate.candidate_id}")
+        replacement = [candidate if item.candidate_id == candidate.candidate_id else item for item in updated.candidates]
+        updated = AssetSourcingPlan(updated.project_id, updated.title, updated.source_asset_manifest, list(updated.sources), replacement, list(updated.matches))
+    return updated
+
+
 def link_asset_candidate(plan: AssetSourcingPlan, manifest: AssetManifest, match: AssetCandidateMatch) -> AssetSourcingPlan:
     """Record an editorial candidate relationship without changing manifest status."""
     validate_asset_sourcing_plan(plan, manifest)

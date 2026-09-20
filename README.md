@@ -69,6 +69,15 @@ fvm asset-candidates --project why-cities-are-getting-hotter --format json --out
 
 This saves `asset-sourcing.json` and `asset-sourcing.md`. It records candidate URLs, source metadata, creators, license and usage information, previews, attribution, rights notes, and editorial relationships. Missing rights metadata stays explicitly missing. `selected` means editorial selection only; it is not legal approval. This layer never fetches, scrapes, downloads, inspects, or validates URLs, and never changes `asset-manifest.json` statuses.
 
+Optionally search Wikimedia Commons for candidate metadata:
+
+```bash
+export FVM_WIKIMEDIA_USER_AGENT="faceless-video-machine/0.1 (you@example.com)"
+fvm search-asset-candidates --project why-cities-are-getting-hotter --asset-id scene-001-asset-001 --limit 5
+```
+
+The adapter uses the official Wikimedia Commons Action API and stores file-page URLs, previews, creators, and license metadata in `asset-sourcing.json`. It does not require an API key, download media, or change asset-manifest statuses. A meaningful User-Agent is required; optional settings include `FVM_WIKIMEDIA_API_URL`, `FVM_WIKIMEDIA_TIMEOUT_SECONDS`, `FVM_WIKIMEDIA_REQUEST_INTERVAL_SECONDS`, and `FVM_WIKIMEDIA_MAX_RESULTS`. License and attribution data must still be reviewed on each file page. Candidates are not legally cleared, and `selected` remains an editorial choice only.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -89,6 +98,7 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `asset-candidates`
 - `add-asset-candidate`
 - `link-asset-candidate`
+- `search-asset-candidates`
 - `generate-script`
 - `script`
 
