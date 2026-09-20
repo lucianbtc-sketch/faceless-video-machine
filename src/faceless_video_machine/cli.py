@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .models import ResearchSource, VideoProject
 from .projects import create_project, slugify
+from .production_planning import create_production_plan, load_production_plan, render_production_plan_markdown, save_production_plan
 from .research import export_research, load_research, save_research
 from .script_generation import TemplateProvider, load_script_draft, render_script_markdown, save_script_draft
 from .script_drafting import create_video_script, load_video_script, render_video_script_markdown, save_video_script
@@ -45,6 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
     draft.add_argument("--project", required=True); draft.add_argument("--projects-dir", default="projects")
     view_video_script = subs.add_parser("video-script", help="display or export an editable video script")
     view_video_script.add_argument("--project", required=True); view_video_script.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_video_script.add_argument("--output"); view_video_script.add_argument("--projects-dir", default="projects")
+    production = subs.add_parser("create-production-plan", help="create an editable production shot list from the video script")
+    production.add_argument("--project", required=True); production.add_argument("--projects-dir", default="projects")
+    view_production = subs.add_parser("production-plan", help="display or export an editable production shot list")
+    view_production.add_argument("--project", required=True); view_production.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_production.add_argument("--output"); view_production.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -75,6 +80,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "video-script":
             script = load_video_script(path); content = json.dumps(script.to_dict(), indent=2) + "\n" if args.format == "json" else render_video_script_markdown(script)
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported video script: {args.output}")
+            else: print(content, end="")
+            return 0
+        if args.command == "create-production-plan":
+            script = load_video_script(path)
+            json_path, markdown_path = save_production_plan(create_production_plan(script), path)
+            print(f"Created production plan: {json_path}"); print(f"Markdown shot list: {markdown_path}"); return 0
+        if args.command == "production-plan":
+            plan = load_production_plan(path); content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_production_plan_markdown(plan)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported production plan: {args.output}")
             else: print(content, end="")
             return 0
         if args.command == "generate-script":

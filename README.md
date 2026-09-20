@@ -37,6 +37,16 @@ fvm video-script --project why-cities-are-getting-hotter --format json --output 
 
 This saves `video-script.json` and `video-script.md`. Each Hook, Introduction, main section, Transition, Conclusion, and Call to action has editable narration, optional visual/B-roll notes, estimated words, and estimated duration. The files are plain JSON and Markdown and can be edited offline.
 
+Create an editable production shot list from the video script:
+
+```bash
+fvm create-production-plan --project why-cities-are-getting-hotter
+fvm production-plan --project why-cities-are-getting-hotter
+fvm production-plan --project why-cities-are-getting-hotter --format json --output production-export.json
+```
+
+This saves `production.json` and `production.md`. The shot list starts with one scene per script section and includes scene numbers, narration references, estimated durations, visual/B-roll direction, asset types, on-screen text, and optional notes. Narration remains in `video-script.json`, which is the authoritative source.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -49,6 +59,8 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `script-plan`
 - `create-video-script`
 - `video-script`
+- `create-production-plan`
+- `production-plan`
 - `generate-script`
 - `script`
 
