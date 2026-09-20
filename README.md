@@ -2,32 +2,43 @@
 
 Free, dependency-light faceless YouTube workflow tooling.
 
-## Step 3: High-retention script planning
+## Step 4: Free AI-assisted script generation
 
-Create a structured planning scaffold for an existing project. It does not generate the final script and uses only Python's standard library.
+Step 4 adds a provider interface and a deterministic `TemplateProvider`. It requires no API key, model download, external service, or subscription. The provider turns an existing research brief and script plan into a structured draft; it does not pretend that generated ideas are sourced facts and does not generate unsupported factual claims.
 
-Supported formats: `explainer`, `documentary/story`, `case study`, `timeline / what happened`, and `list video`.
-
-Pacing options are `slow` (125 words/minute), `standard` (150), and `fast` (175). Duration is configurable and defaults to the project's duration or 8 minutes.
+Create a plan first, then generate a draft:
 
 ```bash
-fvm create-script-plan \
-  --project why-cities-are-getting-hotter \
-  --format explainer \
-  --duration 8 \
-  --pacing standard \
-  --premise "Reveal why familiar city design creates an invisible heat trap" \
-  --question "Why are some city blocks dramatically hotter than others?"
+fvm create-script-plan --project why-cities-are-getting-hotter --format explainer --duration 8 --pacing standard
+fvm generate-script --project why-cities-are-getting-hotter
 ```
 
-The command writes `script-plan.json` and `script-plan.md` inside the project directory. View or export the plan:
+The result is saved inside the project directory as:
+
+```text
+script.json
+script.md
+```
+
+View or export the draft:
 
 ```bash
-fvm script-plan --project why-cities-are-getting-hotter
-fvm script-plan --project why-cities-are-getting-hotter --format json --output plan-export.json
+fvm script --project why-cities-are-getting-hotter
+fvm script --project why-cities-are-getting-hotter --format json --output script-export.json
 ```
 
-The plan contains the premise, audience, word-count/runtime target, cold open, curiosity question, context, reveals, loops, pattern interrupts, payoff, conclusion, call to action, and retention checklist. The checklist flags generic introductions, weak opens, missing questions, empty sections, missing payoff, and overly long cold opens.
+The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
+
+### Existing workflow commands
+
+- `create-project`
+- `add-source`
+- `add-idea`
+- `research-brief`
+- `create-script-plan`
+- `script-plan`
+- `generate-script`
+- `script`
 
 ### Tests
 
@@ -35,4 +46,4 @@ The plan contains the premise, audience, word-count/runtime target, cold open, c
 python -m unittest discover -s tests -v
 ```
 
-No AI APIs, paid services, external dependencies, TTS, video generation, thumbnails, or final script generation are included.
+No Claude, OpenAI, ElevenLabs, paid APIs, TTS, video generation, thumbnails, or subscription services are used.

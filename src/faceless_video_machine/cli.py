@@ -1,4 +1,4 @@
-"""CLI for project, research, and script-planning workflows."""
+"""CLI for project, research, planning, and draft-generation workflows."""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +9,7 @@ from pathlib import Path
 from .models import ResearchSource, VideoProject
 from .projects import create_project, slugify
 from .research import export_research, load_research, save_research
+from .script_generation import TemplateProvider, load_script_draft, render_script_markdown, save_script_draft
 from .script_planning import create_script_plan, load_script_plan, render_script_plan_markdown, save_script_plan
 
 
@@ -38,7 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     research = subs.add_parser("research-brief"); research.add_argument("--project", required=True); research.add_argument("--format", choices=("markdown", "json"), default="markdown"); research.add_argument("--output"); research.add_argument("--projects-dir", default="projects")
     plan = subs.add_parser("create-script-plan")
     plan.add_argument("--project", required=True); plan.add_argument("--format", dest="script_format"); plan.add_argument("--duration", type=float); plan.add_argument("--pacing", choices=("slow", "standard", "fast"), default="standard"); plan.add_argument("--premise", default=""); plan.add_argument("--question", default=""); plan.add_argument("--projects-dir", default="projects")
-    view = subs.add_parser("script-plan"); view.add_argument("--project", required=True); view.add_argument("--format", choices=("markdown", "json"), default="markdown"); view.add_argument("--output"); view.add_argument("--projects-dir", default="projects")
+    view_plan = subs.add_parser("script-plan"); view_plan.add_argument("--project", required=True); view_plan.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_plan.add_argument("--output"); view_plan.add_argument("--projects-dir", default="projects")
+    generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
+    generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
+    view_script = subs.add_parser("script", help="display or export an existing structured script draft")
+    view_script.add_argument("--project", required=True); view_script.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_script.add_argument("--output"); view_script.add_argument("--projects-dir", default="projects")
     return parser
 
 
@@ -47,32 +52,34 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "create-project":
             project = VideoProject(slugify(args.title), args.title, args.topic, args.audience, args.video_format, args.duration, args.notes)
-            destination = create_project(project, args.projects_dir)
-            print(f"Created project: {destination}")
-            return 0
+            destination = create_project(project, args.projects_dir); print(f"Created project: {destination}"); return 0
         path = project_dir(args.projects_dir, args.project)
         if args.command == "create-script-plan":
             project = load_project(path)
             plan = create_script_plan(project.project_id, project.title, project.topic, project.audience, args.script_format or project.video_format, args.duration or project.duration_minutes or 8.0, args.pacing, args.premise, args.question)
-            json_path, markdown_path = save_script_plan(plan, path)
-            print(f"Created script plan: {json_path}"); print(f"Markdown plan: {markdown_path}"); return 0
+            json_path, markdown_path = save_script_plan(plan, path); print(f"Created script plan: {json_path}"); print(f"Markdown plan: {markdown_path}"); return 0
         if args.command == "script-plan":
-            plan = load_script_plan(path)
-            content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_script_plan_markdown(plan)
-            if args.output:
-                Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported script plan: {args.output}")
-            else:
-                print(content, end="")
+            plan = load_script_plan(path); content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_script_plan_markdown(plan)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported script plan: {args.output}")
+            else: print(content, end="")
             return 0
-        brief = load_research(path, args.project)
+        if args.command == "generate-script":
+            project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)
+            json_path, markdown_path = save_script_draft(TemplateProvider().generate(brief, plan), path)
+            print(f"Generated script draft: {json_path}"); print(f"Markdown draft: {markdown_path}"); return 0
+        if args.command == "script":
+            draft = load_script_draft(path); content = json.dumps(draft.to_dict(), indent=2) + "\n" if args.format == "json" else render_script_markdown(draft)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported script draft: {args.output}")
+            else: print(content, end="")
+            return 0
+        project = load_project(path); brief = load_research(path, args.project)
         if args.command == "add-source":
-            brief.sources.append(ResearchSource(args.url, args.title, args.notes, args.key_fact, args.citation)); save_research(brief, path); export_research(brief, path, load_project(path).title); print(f"Added source to {path / 'research.json'}"); return 0
+            brief.sources.append(ResearchSource(args.url, args.title, args.notes, args.key_fact, args.citation)); save_research(brief, path); export_research(brief, path, project.title); print(f"Added source to {path / 'research.json'}"); return 0
         if args.command == "add-idea":
-            brief.generated_ideas.append(args.idea); save_research(brief, path); export_research(brief, path, load_project(path).title); print(f"Added generated idea to {path / 'research.json'}"); return 0
+            brief.generated_ideas.append(args.idea); save_research(brief, path); export_research(brief, path, project.title); print(f"Added generated idea to {path / 'research.json'}"); return 0
         if args.command == "research-brief":
-            content = json.dumps(brief.to_dict(), indent=2) + "\n" if args.format == "json" else export_research(brief, path, load_project(path).title).read_text(encoding="utf-8")
-            if args.output:
-                Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported research brief: {args.output}")
+            content = json.dumps(brief.to_dict(), indent=2) + "\n" if args.format == "json" else export_research(brief, path, project.title).read_text(encoding="utf-8")
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported research brief: {args.output}")
             else: print(content, end="")
             return 0
     except (FileExistsError, FileNotFoundError, ValueError) as error:
