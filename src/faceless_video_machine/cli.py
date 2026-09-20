@@ -10,6 +10,7 @@ from .models import ResearchSource, VideoProject
 from .projects import create_project, slugify
 from .research import export_research, load_research, save_research
 from .script_generation import TemplateProvider, load_script_draft, render_script_markdown, save_script_draft
+from .script_drafting import create_video_script, load_video_script, render_video_script_markdown, save_video_script
 from .script_planning import create_script_plan, load_script_plan, render_script_plan_markdown, save_script_plan
 
 
@@ -40,6 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     plan = subs.add_parser("create-script-plan")
     plan.add_argument("--project", required=True); plan.add_argument("--format", dest="script_format"); plan.add_argument("--duration", type=float); plan.add_argument("--pacing", choices=("slow", "standard", "fast"), default="standard"); plan.add_argument("--premise", default=""); plan.add_argument("--question", default=""); plan.add_argument("--projects-dir", default="projects")
     view_plan = subs.add_parser("script-plan"); view_plan.add_argument("--project", required=True); view_plan.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_plan.add_argument("--output"); view_plan.add_argument("--projects-dir", default="projects")
+    draft = subs.add_parser("create-video-script", help="create an editable script from the project plan")
+    draft.add_argument("--project", required=True); draft.add_argument("--projects-dir", default="projects")
+    view_video_script = subs.add_parser("video-script", help="display or export an editable video script")
+    view_video_script.add_argument("--project", required=True); view_video_script.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_video_script.add_argument("--output"); view_video_script.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -61,6 +66,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "script-plan":
             plan = load_script_plan(path); content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_script_plan_markdown(plan)
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported script plan: {args.output}")
+            else: print(content, end="")
+            return 0
+        if args.command == "create-video-script":
+            project = load_project(path); plan = load_script_plan(path)
+            json_path, markdown_path = save_video_script(create_video_script(project, plan), path)
+            print(f"Created video script: {json_path}"); print(f"Markdown script: {markdown_path}"); return 0
+        if args.command == "video-script":
+            script = load_video_script(path); content = json.dumps(script.to_dict(), indent=2) + "\n" if args.format == "json" else render_video_script_markdown(script)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported video script: {args.output}")
             else: print(content, end="")
             return 0
         if args.command == "generate-script":
