@@ -39,3 +39,29 @@ class VideoProject:
     def from_dict(cls, data: dict[str, Any]) -> "VideoProject":
         """Build a project from data previously saved as JSON."""
         return cls(**data)
+
+
+@dataclass(slots=True)
+class ResearchSource:
+    """A manually recorded source and the facts taken from it."""
+
+    url: str
+    title: str
+    notes: str = ""
+    key_facts: list[str] | None = None
+    citation: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.url.strip():
+            raise ValueError("source url cannot be empty")
+        if not self.title.strip():
+            raise ValueError("source title cannot be empty")
+        if self.key_facts is None:
+            self.key_facts = []
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ResearchSource":
+        return cls(**data)
