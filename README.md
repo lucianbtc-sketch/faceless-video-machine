@@ -57,6 +57,18 @@ fvm asset-manifest --project why-cities-are-getting-hotter --format json --outpu
 
 This saves `asset-manifest.json` and `asset-manifest.md`. It creates one initial requirement per production scene with a deterministic asset ID, source and local-path fields, lifecycle status, rights metadata, attribution, and notes. The manifest is metadata-only: it does not search for, download, inspect, or validate assets. `production.json` remains the authoritative production-plan source.
 
+Initialize and edit an offline asset-candidate plan:
+
+```bash
+fvm create-asset-candidates --project why-cities-are-getting-hotter
+fvm asset-candidates --project why-cities-are-getting-hotter
+fvm add-asset-candidate --project why-cities-are-getting-hotter --asset-id scene-001-asset-001 --candidate-id candidate-001 --source-id manual-notes --source-name "Manual notes" --url "https://example.invalid/item" --title "Recorded candidate" --license "" --usage ""
+fvm link-asset-candidate --project why-cities-are-getting-hotter --asset-id scene-001-asset-001 --candidate-id candidate-001 --relationship shortlisted
+fvm asset-candidates --project why-cities-are-getting-hotter --format json --output asset-sourcing-export.json
+```
+
+This saves `asset-sourcing.json` and `asset-sourcing.md`. It records candidate URLs, source metadata, creators, license and usage information, previews, attribution, rights notes, and editorial relationships. Missing rights metadata stays explicitly missing. `selected` means editorial selection only; it is not legal approval. This layer never fetches, scrapes, downloads, inspects, or validates URLs, and never changes `asset-manifest.json` statuses.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -73,6 +85,10 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `production-plan`
 - `create-asset-manifest`
 - `asset-manifest`
+- `create-asset-candidates`
+- `asset-candidates`
+- `add-asset-candidate`
+- `link-asset-candidate`
 - `generate-script`
 - `script`
 

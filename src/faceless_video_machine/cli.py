@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .models import ResearchSource, VideoProject
 from .asset_manifest import create_asset_manifest, load_asset_manifest, render_asset_manifest_markdown, save_asset_manifest
+from .asset_sourcing import add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
+from .models import AssetCandidate, AssetCandidateMatch, AssetSource
 from .projects import create_project, slugify
 from .production_planning import create_production_plan, load_production_plan, render_production_plan_markdown, save_production_plan
 from .research import export_research, load_research, save_research
@@ -55,6 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
     asset_manifest.add_argument("--project", required=True); asset_manifest.add_argument("--projects-dir", default="projects")
     view_asset_manifest = subs.add_parser("asset-manifest", help="display or export an offline asset manifest")
     view_asset_manifest.add_argument("--project", required=True); view_asset_manifest.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_asset_manifest.add_argument("--output"); view_asset_manifest.add_argument("--projects-dir", default="projects")
+    asset_candidates = subs.add_parser("create-asset-candidates", help="initialize an offline asset candidate plan")
+    asset_candidates.add_argument("--project", required=True); asset_candidates.add_argument("--projects-dir", default="projects")
+    view_asset_candidates = subs.add_parser("asset-candidates", help="display or export asset sourcing candidates")
+    view_asset_candidates.add_argument("--project", required=True); view_asset_candidates.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_asset_candidates.add_argument("--output"); view_asset_candidates.add_argument("--projects-dir", default="projects")
+    add_candidate = subs.add_parser("add-asset-candidate", help="record user-provided asset candidate metadata")
+    add_candidate.add_argument("--project", required=True); add_candidate.add_argument("--asset-id", required=True); add_candidate.add_argument("--candidate-id", required=True); add_candidate.add_argument("--source-id", required=True); add_candidate.add_argument("--source-name", required=True); add_candidate.add_argument("--url", required=True); add_candidate.add_argument("--title", required=True); add_candidate.add_argument("--creator", default=""); add_candidate.add_argument("--license", dest="license_name", default=""); add_candidate.add_argument("--license-url", default=""); add_candidate.add_argument("--usage", dest="usage_information", default=""); add_candidate.add_argument("--preview-url", default=""); add_candidate.add_argument("--attribution", default=""); add_candidate.add_argument("--rights-note", default=""); add_candidate.add_argument("--notes", default=""); add_candidate.add_argument("--source-url", default=""); add_candidate.add_argument("--license-policy-url", default=""); add_candidate.add_argument("--source-kind", choices=("manual", "public_domain", "creative_commons", "local_catalog"), default="manual"); add_candidate.add_argument("--projects-dir", default="projects")
+    link_candidate = subs.add_parser("link-asset-candidate", help="record an editorial candidate relationship")
+    link_candidate.add_argument("--project", required=True); link_candidate.add_argument("--asset-id", required=True); link_candidate.add_argument("--candidate-id", required=True); link_candidate.add_argument("--relationship", choices=("candidate", "shortlisted", "selected", "rejected"), default="candidate"); link_candidate.add_argument("--notes", default=""); link_candidate.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -105,6 +115,26 @@ def main(argv: list[str] | None = None) -> int:
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported asset manifest: {args.output}")
             else: print(content, end="")
             return 0
+        if args.command == "create-asset-candidates":
+            manifest = load_asset_manifest(path)
+            json_path, markdown_path = save_asset_sourcing_plan(create_asset_sourcing_plan(manifest), path)
+            print(f"Created asset candidate plan: {json_path}"); print(f"Markdown candidates: {markdown_path}"); return 0
+        if args.command == "asset-candidates":
+            sourcing = load_asset_sourcing_plan(path); content = json.dumps(sourcing.to_dict(), indent=2) + "\n" if args.format == "json" else render_asset_sourcing_markdown(sourcing)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported asset candidates: {args.output}")
+            else: print(content, end="")
+            return 0
+        if args.command == "add-asset-candidate":
+            manifest = load_asset_manifest(path); sourcing = load_asset_sourcing_plan(path)
+            source = AssetSource(args.source_id, args.source_name, args.source_url, args.license_policy_url, args.source_kind)
+            candidate = AssetCandidate(args.candidate_id, args.asset_id, args.source_id, args.source_name, args.url, args.title, args.creator, args.license_name, args.license_url, args.usage_information, args.preview_url, args.attribution, args.rights_note, args.notes)
+            json_path, _ = save_asset_sourcing_plan(add_asset_candidate(sourcing, manifest, candidate, source), path)
+            print(f"Added asset candidate: {candidate.candidate_id} ({json_path})"); return 0
+        if args.command == "link-asset-candidate":
+            manifest = load_asset_manifest(path); sourcing = load_asset_sourcing_plan(path)
+            match = AssetCandidateMatch(args.asset_id, args.candidate_id, args.relationship, args.notes)
+            json_path, _ = save_asset_sourcing_plan(link_asset_candidate(sourcing, manifest, match), path)
+            print(f"Linked asset candidate: {args.candidate_id} ({json_path})"); return 0
         if args.command == "generate-script":
             project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)
             json_path, markdown_path = save_script_draft(TemplateProvider().generate(brief, plan), path)
