@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 from faceless_video_machine.models import VideoProject
 from faceless_video_machine.projects import create_project, render_markdown, slugify
