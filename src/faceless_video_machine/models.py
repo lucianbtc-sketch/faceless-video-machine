@@ -348,6 +348,7 @@ class AssetCandidate:
     attribution: str = ""
     rights_note: str = ""
     notes: str = ""
+    download_url: str = ""
 
     def __post_init__(self) -> None:
         for field_name, value in (("candidate_id", self.candidate_id), ("asset_id", self.asset_id), ("source_id", self.source_id), ("source_name", self.source_name), ("url", self.url), ("title", self.title)):
@@ -440,6 +441,108 @@ class AssetSourcingPlan:
             sources=[AssetSource.from_dict(item) for item in data.get("sources", [])],
             candidates=[AssetCandidate.from_dict(item) for item in data.get("candidates", [])],
             matches=[AssetCandidateMatch.from_dict(item) for item in data.get("matches", [])],
+        )
+
+
+ASSET_ACQUISITION_STATUSES = ("downloaded", "failed", "skipped")
+
+
+@dataclass(slots=True)
+class AssetDownloadResult:
+    """Integrity metadata for one successfully finalized local download."""
+
+    local_path: str
+    sha256: str
+    byte_count: int
+    content_type: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.local_path.strip():
+            raise ValueError("local_path cannot be empty")
+        if not self.sha256.strip():
+            raise ValueError("sha256 cannot be empty")
+        if self.byte_count < 0:
+            raise ValueError("byte_count cannot be negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetDownloadResult":
+        return cls(**data)
+
+
+@dataclass(slots=True)
+class AssetAcquisition:
+    """One acquisition attempt, kept separate from the authoritative manifest."""
+
+    asset_id: str
+    candidate_id: str
+    status: str
+    local_path: str = ""
+    sha256: str = ""
+    byte_count: int | None = None
+    content_type: str = ""
+    downloaded_at: str = ""
+    error: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.asset_id.strip():
+            raise ValueError("asset_id cannot be empty")
+        if not self.candidate_id.strip():
+            raise ValueError("candidate_id cannot be empty")
+        if self.status not in ASSET_ACQUISITION_STATUSES:
+            raise ValueError(f"unsupported acquisition status: {self.status}")
+        if self.status == "downloaded" and (not self.local_path.strip() or not self.sha256.strip() or self.byte_count is None):
+            raise ValueError("downloaded acquisitions need local path, hash, and byte count")
+        if self.status == "failed" and not self.error.strip():
+            raise ValueError("failed acquisitions need an error")
+        if self.byte_count is not None and self.byte_count < 0:
+            raise ValueError("byte_count cannot be negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetAcquisition":
+        return cls(**data)
+
+
+@dataclass(slots=True)
+class AssetAcquisitionPlan:
+    """Acquisition history linked to, but not replacing, the Asset Manifest."""
+
+    project_id: str
+    title: str
+    source_asset_manifest: str
+    source_asset_sourcing: str
+    acquisitions: list[AssetAcquisition]
+
+    def __post_init__(self) -> None:
+        if not self.project_id.strip():
+            raise ValueError("project_id cannot be empty")
+        if not self.title.strip():
+            raise ValueError("title cannot be empty")
+        if not self.source_asset_manifest.strip() or not self.source_asset_sourcing.strip():
+            raise ValueError("acquisition source references cannot be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "title": self.title,
+            "source_asset_manifest": self.source_asset_manifest,
+            "source_asset_sourcing": self.source_asset_sourcing,
+            "acquisitions": [item.to_dict() for item in self.acquisitions],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetAcquisitionPlan":
+        return cls(
+            project_id=data["project_id"],
+            title=data["title"],
+            source_asset_manifest=data["source_asset_manifest"],
+            source_asset_sourcing=data["source_asset_sourcing"],
+            acquisitions=[AssetAcquisition.from_dict(item) for item in data.get("acquisitions", [])],
         )
 
 

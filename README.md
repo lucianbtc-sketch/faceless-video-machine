@@ -78,6 +78,15 @@ fvm search-asset-candidates --project why-cities-are-getting-hotter --asset-id s
 
 The adapter uses the official Wikimedia Commons Action API and stores file-page URLs, previews, creators, and license metadata in `asset-sourcing.json`. It does not require an API key, download media, or change asset-manifest statuses. A meaningful User-Agent is required; optional settings include `FVM_WIKIMEDIA_API_URL`, `FVM_WIKIMEDIA_TIMEOUT_SECONDS`, `FVM_WIKIMEDIA_REQUEST_INTERVAL_SECONDS`, and `FVM_WIKIMEDIA_MAX_RESULTS`. License and attribution data must still be reviewed on each file page. Candidates are not legally cleared, and `selected` remains an editorial choice only.
 
+Acquire one explicitly selected candidate into the local asset library:
+
+```bash
+fvm acquire-asset --project why-cities-are-getting-hotter --asset-id scene-001-asset-001 --candidate-id wikimedia-commons-123
+fvm asset-acquisitions --project why-cities-are-getting-hotter
+```
+
+Acquisition requires an HTTP(S) `download_url`, an editorially selected candidate, and recorded license or usage metadata by default. It streams to a temporary file, enforces a byte limit, computes a SHA-256 hash, then atomically finalizes the file under `assets/`. It records history in `asset-acquisitions.json` and updates the authoritative manifest to `downloaded`, never `ready`. It does not process media or claim legal clearance. `--allow-missing-rights-metadata` only overrides the metadata block and adds no legal approval.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -99,6 +108,8 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `add-asset-candidate`
 - `link-asset-candidate`
 - `search-asset-candidates`
+- `acquire-asset`
+- `asset-acquisitions`
 - `generate-script`
 - `script`
 

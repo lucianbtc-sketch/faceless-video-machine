@@ -219,6 +219,7 @@ class WikimediaCommonsProvider(AssetSourceProvider):
                         attribution=attribution,
                         rights_note="Verify the file page, license, attribution, and other restrictions before reuse; no legal clearance is provided.",
                         notes=notes + (f" Media URL: {media_url}." if media_url else ""),
+                        download_url=media_url,
                     )
                 )
                 if len(candidates) >= self.config.max_results:

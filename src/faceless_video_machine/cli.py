@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .models import ResearchSource, VideoProject
 from .asset_manifest import create_asset_manifest, load_asset_manifest, render_asset_manifest_markdown, save_asset_manifest
+from .asset_acquisition import AssetAcquisitionError, AssetDownloadConfig, UrlAssetDownloader, acquire_asset, create_asset_acquisition_plan, load_asset_acquisition_plan, save_asset_acquisition_plan
 from .asset_sourcing import AssetSourceError, add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
 from .models import AssetCandidate, AssetCandidateMatch, AssetSource
 from .projects import create_project, slugify
@@ -62,11 +63,15 @@ def build_parser() -> argparse.ArgumentParser:
     view_asset_candidates = subs.add_parser("asset-candidates", help="display or export asset sourcing candidates")
     view_asset_candidates.add_argument("--project", required=True); view_asset_candidates.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_asset_candidates.add_argument("--output"); view_asset_candidates.add_argument("--projects-dir", default="projects")
     add_candidate = subs.add_parser("add-asset-candidate", help="record user-provided asset candidate metadata")
-    add_candidate.add_argument("--project", required=True); add_candidate.add_argument("--asset-id", required=True); add_candidate.add_argument("--candidate-id", required=True); add_candidate.add_argument("--source-id", required=True); add_candidate.add_argument("--source-name", required=True); add_candidate.add_argument("--url", required=True); add_candidate.add_argument("--title", required=True); add_candidate.add_argument("--creator", default=""); add_candidate.add_argument("--license", dest="license_name", default=""); add_candidate.add_argument("--license-url", default=""); add_candidate.add_argument("--usage", dest="usage_information", default=""); add_candidate.add_argument("--preview-url", default=""); add_candidate.add_argument("--attribution", default=""); add_candidate.add_argument("--rights-note", default=""); add_candidate.add_argument("--notes", default=""); add_candidate.add_argument("--source-url", default=""); add_candidate.add_argument("--license-policy-url", default=""); add_candidate.add_argument("--source-kind", choices=("manual", "public_domain", "creative_commons", "local_catalog"), default="manual"); add_candidate.add_argument("--projects-dir", default="projects")
+    add_candidate.add_argument("--project", required=True); add_candidate.add_argument("--asset-id", required=True); add_candidate.add_argument("--candidate-id", required=True); add_candidate.add_argument("--source-id", required=True); add_candidate.add_argument("--source-name", required=True); add_candidate.add_argument("--url", required=True); add_candidate.add_argument("--download-url", default=""); add_candidate.add_argument("--title", required=True); add_candidate.add_argument("--creator", default=""); add_candidate.add_argument("--license", dest="license_name", default=""); add_candidate.add_argument("--license-url", default=""); add_candidate.add_argument("--usage", dest="usage_information", default=""); add_candidate.add_argument("--preview-url", default=""); add_candidate.add_argument("--attribution", default=""); add_candidate.add_argument("--rights-note", default=""); add_candidate.add_argument("--notes", default=""); add_candidate.add_argument("--source-url", default=""); add_candidate.add_argument("--license-policy-url", default=""); add_candidate.add_argument("--source-kind", choices=("manual", "public_domain", "creative_commons", "local_catalog", "other"), default="manual"); add_candidate.add_argument("--projects-dir", default="projects")
     link_candidate = subs.add_parser("link-asset-candidate", help="record an editorial candidate relationship")
     link_candidate.add_argument("--project", required=True); link_candidate.add_argument("--asset-id", required=True); link_candidate.add_argument("--candidate-id", required=True); link_candidate.add_argument("--relationship", choices=("candidate", "shortlisted", "selected", "rejected"), default="candidate"); link_candidate.add_argument("--notes", default=""); link_candidate.add_argument("--projects-dir", default="projects")
     search_candidates = subs.add_parser("search-asset-candidates", help="search Wikimedia Commons metadata without downloading media")
     search_candidates.add_argument("--project", required=True); search_candidates.add_argument("--asset-id", required=True); search_candidates.add_argument("--limit", type=int); search_candidates.add_argument("--timeout", type=float); search_candidates.add_argument("--user-agent"); search_candidates.add_argument("--projects-dir", default="projects")
+    acquire = subs.add_parser("acquire-asset", help="download one explicitly selected asset")
+    acquire.add_argument("--project", required=True); acquire.add_argument("--asset-id", required=True); acquire.add_argument("--candidate-id", required=True); acquire.add_argument("--output-dir"); acquire.add_argument("--max-bytes", type=int); acquire.add_argument("--timeout", type=float); acquire.add_argument("--allow-missing-rights-metadata", action="store_true"); acquire.add_argument("--overwrite", action="store_true"); acquire.add_argument("--projects-dir", default="projects")
+    acquisitions = subs.add_parser("asset-acquisitions", help="display or export asset acquisition history")
+    acquisitions.add_argument("--project", required=True); acquisitions.add_argument("--format", choices=("markdown", "json"), default="markdown"); acquisitions.add_argument("--output"); acquisitions.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -129,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "add-asset-candidate":
             manifest = load_asset_manifest(path); sourcing = load_asset_sourcing_plan(path)
             source = AssetSource(args.source_id, args.source_name, args.source_url, args.license_policy_url, args.source_kind)
-            candidate = AssetCandidate(args.candidate_id, args.asset_id, args.source_id, args.source_name, args.url, args.title, args.creator, args.license_name, args.license_url, args.usage_information, args.preview_url, args.attribution, args.rights_note, args.notes)
+            candidate = AssetCandidate(args.candidate_id, args.asset_id, args.source_id, args.source_name, args.url, args.title, args.creator, args.license_name, args.license_url, args.usage_information, args.preview_url, args.attribution, args.rights_note, args.notes, args.download_url)
             json_path, _ = save_asset_sourcing_plan(add_asset_candidate(sourcing, manifest, candidate, source), path)
             print(f"Added asset candidate: {candidate.candidate_id} ({json_path})"); return 0
         if args.command == "link-asset-candidate":
@@ -152,6 +157,37 @@ def main(argv: list[str] | None = None) -> int:
             updated = merge_asset_candidates(sourcing, manifest, WikimediaCommonsProvider.source, candidates)
             json_path, _ = save_asset_sourcing_plan(updated, path)
             print(f"Found {len(candidates)} Wikimedia Commons candidates; saved: {json_path}"); return 0
+        if args.command == "acquire-asset":
+            manifest = load_asset_manifest(path); sourcing = load_asset_sourcing_plan(path)
+            try:
+                acquisition_plan = load_asset_acquisition_plan(path)
+            except FileNotFoundError:
+                acquisition_plan = create_asset_acquisition_plan(manifest, sourcing)
+            config = AssetDownloadConfig.from_environment()
+            if args.output_dir or args.max_bytes or args.timeout:
+                config = AssetDownloadConfig(args.output_dir or config.output_dir, args.max_bytes or config.max_bytes, args.timeout or config.timeout_seconds, config.max_redirects)
+            output_dir = Path(config.output_dir)
+            if not output_dir.is_absolute():
+                output_dir = path / output_dir
+            updated_manifest, acquisition = acquire_asset(manifest, sourcing, args.asset_id, args.candidate_id, output_dir, UrlAssetDownloader(config), args.allow_missing_rights_metadata, args.overwrite)
+            if acquisition.status == "downloaded":
+                acquisition_plan.acquisitions.append(acquisition)
+                save_asset_manifest(updated_manifest, path)
+                save_asset_acquisition_plan(acquisition_plan, path)
+                print(f"Acquired asset: {acquisition.local_path}")
+                return 0
+            acquisition_plan.acquisitions.append(acquisition)
+            save_asset_acquisition_plan(acquisition_plan, path)
+            print(f"Asset acquisition failed: {acquisition.error}", file=sys.stderr)
+            return 1
+        if args.command == "asset-acquisitions":
+            plan = load_asset_acquisition_plan(path)
+            content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else (path / "asset-acquisitions.md").read_text(encoding="utf-8")
+            if args.output:
+                Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported asset acquisitions: {args.output}")
+            else:
+                print(content, end="")
+            return 0
         if args.command == "generate-script":
             project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)
             json_path, markdown_path = save_script_draft(TemplateProvider().generate(brief, plan), path)
@@ -171,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported research brief: {args.output}")
             else: print(content, end="")
             return 0
-    except (AssetSourceError, FileExistsError, FileNotFoundError, ValueError) as error:
+    except (AssetAcquisitionError, AssetSourceError, FileExistsError, FileNotFoundError, ValueError) as error:
         print(str(error), file=sys.stderr); return 1
     return 1
 
