@@ -12,6 +12,7 @@ from .asset_acquisition import AssetAcquisitionError, AssetDownloadConfig, UrlAs
 from .asset_validation import validate_asset
 from .asset_sourcing import AssetSourceError, add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
 from .models import AssetCandidate, AssetCandidateMatch, AssetSource
+from .narration import add_narration, create_narration_plan, load_narration_plan, render_narration_markdown, save_narration_plan, validate_narration
 from .projects import create_project, slugify
 from .production_planning import create_production_plan, load_production_plan, render_production_plan_markdown, save_production_plan
 from .research import export_research, load_research, save_research
@@ -75,6 +76,14 @@ def build_parser() -> argparse.ArgumentParser:
     acquisitions.add_argument("--project", required=True); acquisitions.add_argument("--format", choices=("markdown", "json"), default="markdown"); acquisitions.add_argument("--output"); acquisitions.add_argument("--projects-dir", default="projects")
     validation = subs.add_parser("validate-asset", help="validate one downloaded asset locally")
     validation.add_argument("--project", required=True); validation.add_argument("--asset-id", required=True); validation.add_argument("--projects-dir", default="projects")
+    create_narration = subs.add_parser("create-narration-plan", help="create a local narration plan from the video script")
+    create_narration.add_argument("--project", required=True); create_narration.add_argument("--projects-dir", default="projects")
+    add_narration_command = subs.add_parser("add-narration", help="record a user-provided local narration path")
+    add_narration_command.add_argument("--project", required=True); add_narration_command.add_argument("--section", type=int, required=True); add_narration_command.add_argument("--path", required=True); add_narration_command.add_argument("--duration", type=float); add_narration_command.add_argument("--notes", default=""); add_narration_command.add_argument("--projects-dir", default="projects")
+    validate_narration_command = subs.add_parser("validate-narration", help="validate local narration files")
+    validate_narration_command.add_argument("--project", required=True); validate_narration_command.add_argument("--projects-dir", default="projects")
+    view_narration = subs.add_parser("narration", help="display the local narration plan")
+    view_narration.add_argument("--project", required=True); view_narration.add_argument("--format", choices=("markdown", "json"), default="markdown"); view_narration.add_argument("--output"); view_narration.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -199,6 +208,27 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             save_asset_manifest(updated_manifest, path)
             print(f"Asset is ready: {args.asset_id}")
+            return 0
+        if args.command == "create-narration-plan":
+            script = load_video_script(path)
+            json_path, markdown_path = save_narration_plan(create_narration_plan(script), path)
+            print(f"Created narration plan: {json_path}"); print(f"Markdown narration: {markdown_path}"); return 0
+        if args.command == "add-narration":
+            script = load_video_script(path); plan = load_narration_plan(path)
+            updated = add_narration(plan, script, args.section, args.path, args.duration, args.notes)
+            json_path, _ = save_narration_plan(updated, path)
+            print(f"Added narration for section {args.section}: {json_path}"); return 0
+        if args.command == "validate-narration":
+            script = load_video_script(path); plan = load_narration_plan(path)
+            updated, result = validate_narration(plan, script)
+            if not result.valid:
+                print("Narration validation failed: " + "; ".join(result.errors), file=sys.stderr); return 1
+            save_narration_plan(updated, path)
+            print(f"Narration validated: {path / 'narration.json'}"); return 0
+        if args.command == "narration":
+            plan = load_narration_plan(path); content = json.dumps(plan.to_dict(), indent=2) + "\n" if args.format == "json" else render_narration_markdown(plan)
+            if args.output: Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported narration: {args.output}")
+            else: print(content, end="")
             return 0
         if args.command == "generate-script":
             project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)

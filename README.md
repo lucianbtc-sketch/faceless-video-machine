@@ -95,6 +95,17 @@ fvm validate-asset --project why-cities-are-getting-hotter --asset-id scene-001-
 
 Validation checks the recorded file path, readability, non-zero size, byte count, and SHA-256 against `asset-acquisitions.json`. Only a fully passing asset changes from `downloaded` to `ready`; `ready` means local integrity validated, not legal clearance or media-processing approval.
 
+Manage user-provided local narration:
+
+```bash
+fvm create-narration-plan --project why-cities-are-getting-hotter
+fvm add-narration --project why-cities-are-getting-hotter --section 1 --path narration/section-001.wav
+fvm validate-narration --project why-cities-are-getting-hotter
+fvm narration --project why-cities-are-getting-hotter
+```
+
+WAV duration is read with Python's standard-library `wave` module. Non-WAV files require an explicit positive `--duration`. No TTS, recording, downloads, FFmpeg, or media processing is performed.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -119,6 +130,10 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `acquire-asset`
 - `asset-acquisitions`
 - `validate-asset`
+- `create-narration-plan`
+- `add-narration`
+- `validate-narration`
+- `narration`
 - `generate-script`
 - `script`
 

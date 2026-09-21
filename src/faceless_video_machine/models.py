@@ -567,6 +567,94 @@ class AssetValidationResult:
         return cls(**data)
 
 
+NARRATION_STATUSES = ("needed", "recorded", "validated")
+
+
+@dataclass(slots=True)
+class NarrationSegment:
+    """A user-provided local narration file linked to one script section."""
+
+    segment_id: str
+    script_section_index: int
+    local_path: str = ""
+    status: str = "needed"
+    duration_seconds: float | None = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.segment_id.strip():
+            raise ValueError("segment_id cannot be empty")
+        if self.script_section_index <= 0:
+            raise ValueError("script_section_index must be greater than zero")
+        if self.status not in NARRATION_STATUSES:
+            raise ValueError(f"unsupported narration status: {self.status}")
+        if self.duration_seconds is not None and self.duration_seconds <= 0:
+            raise ValueError("duration_seconds must be greater than zero")
+        if self.status in ("recorded", "validated") and not self.local_path.strip():
+            raise ValueError(f"{self.status} narration needs a local path")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "NarrationSegment":
+        return cls(**data)
+
+
+@dataclass(slots=True)
+class NarrationPlan:
+    """A local narration track plan linked to the authoritative VideoScript."""
+
+    project_id: str
+    title: str
+    source_script: str
+    segments: list[NarrationSegment]
+
+    def __post_init__(self) -> None:
+        if not self.project_id.strip():
+            raise ValueError("project_id cannot be empty")
+        if not self.title.strip():
+            raise ValueError("title cannot be empty")
+        if not self.source_script.strip():
+            raise ValueError("source_script cannot be empty")
+        segment_ids = [segment.segment_id for segment in self.segments]
+        if len(segment_ids) != len(set(segment_ids)):
+            raise ValueError("narration segment IDs must be unique")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "title": self.title,
+            "source_script": self.source_script,
+            "segments": [segment.to_dict() for segment in self.segments],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "NarrationPlan":
+        return cls(
+            project_id=data["project_id"],
+            title=data["title"],
+            source_script=data["source_script"],
+            segments=[NarrationSegment.from_dict(item) for item in data.get("segments", [])],
+        )
+
+
+@dataclass(slots=True)
+class NarrationValidationResult:
+    """Validation report for a local narration plan."""
+
+    valid: bool
+    checks: list[str]
+    errors: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "NarrationValidationResult":
+        return cls(**data)
+
+
 @dataclass(slots=True)
 class ResearchSource:
     """A manually recorded source and the facts taken from it."""
