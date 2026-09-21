@@ -547,6 +547,27 @@ class AssetAcquisitionPlan:
 
 
 @dataclass(slots=True)
+class AssetValidationResult:
+    """Local integrity checks for one downloaded asset."""
+
+    asset_id: str
+    valid: bool
+    checks: list[str]
+    errors: list[str]
+
+    def __post_init__(self) -> None:
+        if not self.asset_id.strip():
+            raise ValueError("asset_id cannot be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssetValidationResult":
+        return cls(**data)
+
+
+@dataclass(slots=True)
 class ResearchSource:
     """A manually recorded source and the facts taken from it."""
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from .models import ResearchSource, VideoProject
 from .asset_manifest import create_asset_manifest, load_asset_manifest, render_asset_manifest_markdown, save_asset_manifest
 from .asset_acquisition import AssetAcquisitionError, AssetDownloadConfig, UrlAssetDownloader, acquire_asset, create_asset_acquisition_plan, load_asset_acquisition_plan, save_asset_acquisition_plan
+from .asset_validation import validate_asset
 from .asset_sourcing import AssetSourceError, add_asset_candidate, create_asset_sourcing_plan, link_asset_candidate, load_asset_sourcing_plan, render_asset_sourcing_markdown, save_asset_sourcing_plan
 from .models import AssetCandidate, AssetCandidateMatch, AssetSource
 from .projects import create_project, slugify
@@ -72,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     acquire.add_argument("--project", required=True); acquire.add_argument("--asset-id", required=True); acquire.add_argument("--candidate-id", required=True); acquire.add_argument("--output-dir"); acquire.add_argument("--max-bytes", type=int); acquire.add_argument("--timeout", type=float); acquire.add_argument("--allow-missing-rights-metadata", action="store_true"); acquire.add_argument("--overwrite", action="store_true"); acquire.add_argument("--projects-dir", default="projects")
     acquisitions = subs.add_parser("asset-acquisitions", help="display or export asset acquisition history")
     acquisitions.add_argument("--project", required=True); acquisitions.add_argument("--format", choices=("markdown", "json"), default="markdown"); acquisitions.add_argument("--output"); acquisitions.add_argument("--projects-dir", default="projects")
+    validation = subs.add_parser("validate-asset", help="validate one downloaded asset locally")
+    validation.add_argument("--project", required=True); validation.add_argument("--asset-id", required=True); validation.add_argument("--projects-dir", default="projects")
     generate = subs.add_parser("generate-script", help="generate a structured draft with the free TemplateProvider")
     generate.add_argument("--project", required=True); generate.add_argument("--projects-dir", default="projects")
     view_script = subs.add_parser("script", help="display or export an existing structured script draft")
@@ -187,6 +190,15 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.output).write_text(content, encoding="utf-8"); print(f"Exported asset acquisitions: {args.output}")
             else:
                 print(content, end="")
+            return 0
+        if args.command == "validate-asset":
+            manifest = load_asset_manifest(path); acquisitions = load_asset_acquisition_plan(path)
+            updated_manifest, result = validate_asset(manifest, acquisitions, args.asset_id)
+            if not result.valid:
+                print("Asset validation failed: " + "; ".join(result.errors), file=sys.stderr)
+                return 1
+            save_asset_manifest(updated_manifest, path)
+            print(f"Asset is ready: {args.asset_id}")
             return 0
         if args.command == "generate-script":
             project = load_project(path); plan = load_script_plan(path); brief = load_research(path, project.project_id)

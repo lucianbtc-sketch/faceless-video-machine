@@ -87,6 +87,14 @@ fvm asset-acquisitions --project why-cities-are-getting-hotter
 
 Acquisition requires an HTTP(S) `download_url`, an editorially selected candidate, and recorded license or usage metadata by default. It streams to a temporary file, enforces a byte limit, computes a SHA-256 hash, then atomically finalizes the file under `assets/`. It records history in `asset-acquisitions.json` and updates the authoritative manifest to `downloaded`, never `ready`. It does not process media or claim legal clearance. `--allow-missing-rights-metadata` only overrides the metadata block and adds no legal approval.
 
+Validate one downloaded asset locally:
+
+```bash
+fvm validate-asset --project why-cities-are-getting-hotter --asset-id scene-001-asset-001
+```
+
+Validation checks the recorded file path, readability, non-zero size, byte count, and SHA-256 against `asset-acquisitions.json`. Only a fully passing asset changes from `downloaded` to `ready`; `ready` means local integrity validated, not legal clearance or media-processing approval.
+
 The draft includes the cold open, hook, context, curiosity loops, progressive reveals, pattern interrupts, payoff, conclusion, CTA, sourced facts, and references. A future free/local provider can implement the `ScriptProvider` interface without changing the CLI's project layout.
 
 ### Existing workflow commands
@@ -110,6 +118,7 @@ The draft includes the cold open, hook, context, curiosity loops, progressive re
 - `search-asset-candidates`
 - `acquire-asset`
 - `asset-acquisitions`
+- `validate-asset`
 - `generate-script`
 - `script`
 
